@@ -52,27 +52,45 @@ def resolve_nse_symbols(holdings):
 
 
 def download_prices(symbols, start, end):
-    yahoo_symbols = [f'{s}.NS' for s in symbols]
-    data = yf.download(
-        tickers=yahoo_symbols,
-        start=start.isoformat(),
-        end=(end + timedelta(days=1)).isoformat(),
-        auto_adjust=True,
-        progress=False,
-        group_by='ticker',
-        threads=True,
-        timeout=30,
-    )
+    """Download in small batches so one large Yahoo request cannot stall the bot."""
     prices = {}
-    if data.empty:
-        return prices
-    for symbol in yahoo_symbols:
+    unique = list(dict.fromkeys(f"{s}.NS" for s in symbols))
+    batch_size = 20
+    for offset in range(0, len(unique), batch_size):
+        batch = unique[offset:offset + batch_size]
         try:
-            series = data[symbol]['Close'].dropna() if isinstance(data.columns, pd.MultiIndex) else data['Close'].dropna()
-            if not series.empty:
-                prices[symbol] = series
-        except (KeyError, TypeError):
+            data = yf.download(
+                tickers=batch,
+                start=start.isoformat(),
+                end=(end + timedelta(days=1)).isoformat(),
+                auto_adjust=True,
+                progress=False,
+                group_by="ticker",
+                threads=True,
+                timeout=15,
+            )
+        except Exception:
+            log.exception("Yahoo Finance batch failed: %s-%s", offset + 1, min(offset + batch_size, len(unique)))
             continue
+
+        if data is None or data.empty:
+            continue
+
+        for symbol in batch:
+            try:
+                if isinstance(data.columns, pd.MultiIndex):
+                    if symbol not in data.columns.get_level_values(0):
+                        continue
+                    series = data[symbol]["Close"].dropna()
+                else:
+                    # yfinance returns flat columns when a batch contains one ticker.
+                    series = data["Close"].dropna()
+                if not series.empty:
+                    prices[symbol] = series
+            except (KeyError, TypeError, AttributeError):
+                continue
+
+        log.info("Downloaded price data for %s/%s tickers", min(offset + batch_size, len(unique)), len(unique))
     return prices
 
 
@@ -162,7 +180,7 @@ async def help_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def index_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not is_allowed(update):
         return
-    await send_reply(update, 'Checking the 129 disclosed holdings and latest available share prices. Please wait…')
+    await send_reply(update, 'Checking the disclosed holdings and latest available share prices. This can take up to a few minutes; I will send the result in a separate message.')
     try:
         result = await asyncio.to_thread(calculate_index)
         marker = '🟢' if result['change'] >= 0 else '🔴'

@@ -15,10 +15,10 @@ logging.basicConfig(level=logging.INFO)
 log = logging.getLogger("jio-flexi-webhook")
 
 telegram_app = Application.builder().token(TOKEN).build()
-telegram_app.add_handler(CommandHandler("start", start))
-telegram_app.add_handler(CommandHandler("help", help_cmd))
-telegram_app.add_handler(CommandHandler("index", index_cmd))
-telegram_app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, text_handler))
+telegram_app.add_handler(CommandHandler("start", start, block=False))
+telegram_app.add_handler(CommandHandler("help", help_cmd, block=False))
+telegram_app.add_handler(CommandHandler("index", index_cmd, block=False))
+telegram_app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, text_handler, block=False))
 
 webhook_secret = secrets.token_urlsafe(32)
 

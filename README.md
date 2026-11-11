@@ -45,3 +45,10 @@ Render Free Web Services can spin down after a period without inbound traffic. T
 - `holdings.csv` — the 129 listed holdings extracted from the supplied statement
 - `requirements.txt` — Python dependencies
 - `render.yaml` — Render Free Web Service Blueprint
+
+
+## Slow or missing replies — updated build
+
+This build runs Telegram command handlers without blocking the webhook acknowledgement and downloads Yahoo Finance prices in batches of 20 with a 15-second request timeout per batch. The bot sends an immediate acknowledgement, then sends the calculated result separately. Some Yahoo Finance/NSE data may still be delayed or unavailable; the bot will report insufficient coverage rather than fabricate an index.
+
+After replacing the files in GitHub, trigger a new Render deployment. Check Render Logs if no final result arrives.
